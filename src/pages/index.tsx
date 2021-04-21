@@ -1,78 +1,146 @@
-// SPA
-/*
- Estratégia de requisições mais comum para SPA's 
- o problema é que crawlers responsaveis por indexar conteúdo
- ainda não vão enxergar este conteudo pois ele pode demorar
- um tempo para ser exibidos em tela
-*/
-// import { useEffect } from "react"
+import { GetStaticProps } from 'next'
+import Image from 'next/image'
+import Link from 'next/link'
+import { format, parseISO } from 'date-fns'
+import ptBR from 'date-fns/locale/pt-BR'
+import { api } from '../services/api'
 
-// export default function Home() {
-//   useEffect(() => {
-//     fetch('http://localhost:3333/episodes')
-//       .then(response => response.json())
-//       .then(data => console.log(data))
-//   }, [])
+import styles from './home.module.scss'
+import { ConvertDurationToTimeString } from '../utils/ConvertDurationToTimeString'
 
-//   return <h1>Index</h1>
-// }
+type Episodes = {
+  id: string;
+  title: string;
+  thumbnail: string;
+  members: string;
+  duration: Number;
+  durationAsString: string;
+  url: string;
+  publishedAt: string;
+}
 
+type HomeProps = {
+  latestEpisodes: Episodes[];
+  allEpisodes: Episodes[];
+}
 
-// SSR
-/*
-  Este formato de requisição utilizando o SSR do Nextjs com o getServerSideProps
-  nos possibilita realizar requisições a uma api como no exemplo anterior, mas
-  a diferença é que o servidor node do next fica com esses dados das requisições
-  e entrega junto com o a interface, ou seja, mesmo se disabilitarmos o javascript
-  do navegador os dados continuarão a serem exibidos na nossa interface. 
-  O getServerSideProps é executado toda vez que alguem executar a Home da nossa aplicação 
-*/
-
-// export default function Home(props) {
-//   // console.log(props.episodes)
-
-//   return (
-//     <div>
-//       <h1>Index</h1>
-//       <p>{JSON.stringify(props.episodes)}</p>
-//     </div>
-//   )
-// }
-
-// export async function getServerSideProps() {
-//   const response = await fetch('http://localhost:3333/episodes')
-//   const data = await response.json()
-
-//   return {
-//     props: {
-//       episodes: data
-//     }
-//   }
-// }
-
-
-// SSG
-/*
-  Neste formato com o getStaticProps as nossas páginas são geradas de forma
-  totalmente estáticas, mas com uma estratégia de revalidação (que em um determinado tempo)
-  irá atualizar os nossos dados com uma nova requisição e gerando assim uma nova página
-*/
-export default function Home(props) {
+export default function Home({ latestEpisodes, allEpisodes }: HomeProps) {
   return (
-    <div>
-      <h1>Index</h1>
-      <p>{JSON.stringify(props.episodes)}</p>
+    <div className={styles.homepage}>
+      <section className={styles.latestEpisodes}>
+        <h2>Últimos lançamentos</h2>
+
+        <ul>
+          {latestEpisodes.map(episode => {
+            return (
+              <li key={episode.id}>
+                <Image
+                  width={192}
+                  height={192}
+                  src={episode.thumbnail}
+                  alt={episode.title}
+                  objectFit="cover"
+                />
+
+                <div className={styles.episodeDetails}>
+                  <Link href={`/episodes/${episode.id}`}>
+                    <a >{episode.title}</a>
+                  </Link>
+                  <p>{episode.members}</p>
+                  <span>{episode.publishedAt}</span>
+                  <span>{episode.durationAsString}</span>
+                </div>
+
+                <button type="button">
+                  <img src="./play-green.svg" alt="Tocar episódio" />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <section className={styles.allEpisodes}>
+        <h2>Todos episódios</h2>
+
+        <table cellSpacing={0}>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Podcast</th>
+              <th>Integrantes</th>
+              <th>Data</th>
+              <th>Duração</th>
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {allEpisodes.map(episode => {
+              return (
+                <tr key={episode.id}>
+                  <td>
+                    <Image
+                      width={120}
+                      height={120}
+                      src={episode.thumbnail}
+                      alt={episode.title}
+                      objectFit="cover"
+                    />
+                  </td>
+                  <td>
+                    <Link href={`/episodes/${episode.id}`} >
+                      <a >{episode.title}</a>
+                    </Link>
+                  </td>
+                  <td>{episode.members}</td>
+                  <td style={{ width: 100 }} >{episode.publishedAt}</td>
+                  <td>{episode.durationAsString}</td>
+                  <td>
+                    <button type="button">
+                      <img src="./play-green.svg" alt="Tocar episódio" />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </section>
     </div>
   )
 }
 
-export async function getStaticProps() {
-  const response = await fetch('http://localhost:3333/episodes')
-  const data = await response.json()
+export const getStaticProps: GetStaticProps = async () => {
+  const { data } = await api.get('episodes', {
+    params: {
+      _limit: 12,
+      _sort: 'published_at',
+      _order: 'desc'
+    }
+  })
+
+  const episodes = data.map(episode => {
+    const { id, title, thumbnail, members, published_at, description, file } = episode
+    return {
+      id,
+      title,
+      thumbnail,
+      members,
+      publishedAt: format(parseISO(published_at), 'd MMM yy', { locale: ptBR }),
+      duration: Number(file.duration),
+      durationAsString: ConvertDurationToTimeString(Number(file.duration)),
+      url: file.url
+    }
+  })
+
+  const latestEpisodes = episodes.slice(0, 2)
+  const allEpisodes = episodes.slice(2, episodes.length)
 
   return {
     props: {
-      episodes: data,
+      latestEpisodes,
+      allEpisodes
     },
 
     revalidate: 60 * 60 * 8,
