@@ -1,9 +1,14 @@
+import Image from 'next/image'
+import Link from 'next/link'
+import Head from 'next/head'
+import { GetStaticPaths } from 'next'
+import { useContext } from 'react'
+
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import parseISO from 'date-fns/parseISO'
-import { GetStaticPaths } from 'next'
-import Image from 'next/image'
-import Link from 'next/link'
+
+import { PlayerContext } from '../../contexts/contextPlayer'
 import { api } from '../../services/api'
 import { ConvertDurationToTimeString } from '../../utils/ConvertDurationToTimeString'
 
@@ -15,7 +20,7 @@ type Episode = {
     description: string;
     thumbnail: string;
     members: string;
-    duration: Number;
+    duration: number;
     durationAsString: string;
     url: string;
     publishedAt: string;
@@ -26,8 +31,13 @@ type EpisodeProps = {
 }
 
 export default function Episode({ episode }: EpisodeProps) {
+    const { play } = useContext(PlayerContext)
+
     return (
         <div className={styles.episode}>
+            <Head>
+                <title>{episode.title} | Podcaster</title>
+            </Head>
             <div className={styles.thumbnailContainer}>
                 <Link href="/">
                     <button type-="button">
@@ -40,7 +50,7 @@ export default function Episode({ episode }: EpisodeProps) {
                     src={episode.thumbnail}
                     objectFit="cover"
                 />
-                <button type="button">
+                <button type="button" onClick={() => play(episode)}>
                     <img src="/play.svg" alt="Tocar episódio" />
                 </button>
             </div>
@@ -95,8 +105,8 @@ export const getStaticProps = async (ctx) => {
         thumbnail,
         members,
         publishedAt: format(parseISO(published_at), 'd MMM yy', { locale: ptBR }),
-        duration: Number(file.duration),
-        durationAsString: ConvertDurationToTimeString(Number(file.duration)),
+        duration: file.duration,
+        durationAsString: ConvertDurationToTimeString(file.duration),
         description,
         url: file.url
     }
